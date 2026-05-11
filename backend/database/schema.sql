@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS `models` (
   `phone` VARCHAR(50) DEFAULT '',
   `email` VARCHAR(255) DEFAULT '',
   `facebook` VARCHAR(500) DEFAULT '',
-  `image_url` VARCHAR(500) DEFAULT '',
+  `image_url` LONGTEXT DEFAULT NULL,
   `portfolio_links` JSON DEFAULT NULL,
   `portfolio_images` JSON DEFAULT NULL,
   `projects` JSON DEFAULT NULL,
