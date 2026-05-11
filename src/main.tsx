@@ -5,27 +5,48 @@ import './index.css';
 
 import { API_BASE_URL } from './config';
 
+// Auth keys that must NEVER be globally synced — they are browser-specific
+const AUTH_LOCAL_KEYS = ['studio_auth_current_user', 'studio_auth_users'];
+
 async function initApp() {
   try {
-    // 1. Fetch entire database state (SQL tables + Store values)
+    // 1. Preserve browser-local auth state BEFORE clearing
+    const savedAuth: Record<string, string | null> = {};
+    for (const key of AUTH_LOCAL_KEYS) {
+      savedAuth[key] = localStorage.getItem(key);
+    }
+
+    // 2. Fetch entire database state (SQL tables + Store values)
     const response = await fetch(`${API_BASE_URL}/sync`);
     if (response.ok) {
       const data = await response.json();
       
-      // 2. Clear current local storage and replace with fresh DB data to ensure syncing
+      // 3. Clear localStorage and replace with fresh DB data
       localStorage.clear();
       for (const [key, value] of Object.entries(data)) {
+        // SKIP auth keys from server — they must stay browser-local
+        if (AUTH_LOCAL_KEYS.includes(key)) continue;
         localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      }
+    }
+
+    // 4. Restore browser-local auth state AFTER sync
+    for (const key of AUTH_LOCAL_KEYS) {
+      if (savedAuth[key] !== null) {
+        localStorage.setItem(key, savedAuth[key]!);
       }
     }
   } catch (err) {
     console.error('Failed to sync with backend DB. App will run in offline/local mode.', err);
   }
 
-  // 3. Monkey patch localStorage to automatically pipe saves to our SQL backend
+  // 5. Monkey patch localStorage to automatically pipe saves to our SQL backend
   const originalSetItem = localStorage.setItem;
-  localStorage.setItem = function(key, value) {
+  localStorage.setItem = function(key: string, value: string) {
     originalSetItem.apply(this, arguments as any); // Update local cache synchronously
+    
+    // NEVER sync auth keys to backend — they are browser-specific
+    if (AUTH_LOCAL_KEYS.includes(key)) return;
     
     // Fire-and-forget sync to backend
     fetch(`${API_BASE_URL}/store/${key}`, {
