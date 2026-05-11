@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export type Role = 'admin' | 'manager' | 'user';
 
@@ -87,7 +88,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('studio_auth_users', JSON.stringify(users));
   }, [users]);
 
+  // On mount, fetch users from the MySQL users table
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/get_users.php`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(apiUsers => {
+        if (Array.isArray(apiUsers) && apiUsers.length > 0) {
+          setUsers(apiUsers);
+        }
+      })
+      .catch(() => {
+        // Offline fallback: keep localStorage users
+      });
+  }, []);
+
   const login = (email: string, password?: string) => {
+    // Try API login first (validates against MySQL users table with bcrypt)
+    fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(user => {
+        setCurrentUser(user);
+      })
+      .catch(() => {
+        // API offline — fallback to localStorage users
+      });
+
+    // Synchronous fallback for immediate UI response
     const user = users.find(u => u.email === email && (!password || u.password === password));
     if (user) {
       setCurrentUser(user);
@@ -98,22 +128,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setCurrentUser(null);
+    fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' }).catch(() => {});
   };
 
   const addUser = (user: Omit<User, 'id'>) => {
-    const newUser = { ...user, id: `u${Date.now()}` };
-    setUsers([...users, newUser]);
+    const tempId = `u${Date.now()}`;
+    const newUser = { ...user, id: tempId };
+    
+    // Optimistic local update
+    setUsers(prev => [...prev, newUser]);
+
+    // Persist to MySQL users table
+    fetch(`${API_BASE_URL}/add_user.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(savedUser => {
+        // Replace temp user with the real one from DB (correct ID + hashed password)
+        setUsers(prev => prev.map(u => u.id === tempId ? savedUser : u));
+      })
+      .catch(() => {
+        // If API fails, keep the optimistic local version
+      });
   };
 
   const updateUser = (id: string, updatedFields: Partial<User>) => {
+    // Optimistic local update
     setUsers(users.map(u => u.id === id ? { ...u, ...updatedFields } : u));
     if (currentUser?.id === id) {
       setCurrentUser(prev => prev ? { ...prev, ...updatedFields } : null);
     }
+
+    // Persist to MySQL users table
+    fetch(`${API_BASE_URL}/update_user.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updatedFields })
+    }).catch(() => {});
   };
 
   const deleteUser = (id: string) => {
     setUsers(users.filter(u => u.id !== id));
+
+    // Delete from MySQL users table
+    fetch(`${API_BASE_URL}/delete_user.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).catch(() => {});
   };
 
   return (
