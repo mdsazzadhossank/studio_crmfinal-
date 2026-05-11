@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { User, Phone, Mail, Facebook, DollarSign, Briefcase, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, Facebook, DollarSign, Briefcase, Plus, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function PublicModelRegistration() {
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [newModel, setNewModel] = useState({ 
     name: '', 
     category: '', 
@@ -99,29 +102,35 @@ export default function PublicModelRegistration() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const savedModelsStr = localStorage.getItem('studio_models');
-    let models = [];
-    if (savedModelsStr) {
-      try {
-        models = JSON.parse(savedModelsStr);
-      } catch (err) {}
-    }
+    setIsSubmitting(true);
+    setSubmitError('');
 
     const finalModel = {
       ...newModel,
-      id: `m${Date.now()}`,
       imageUrl: newModel.imageUrl || `https://picsum.photos/seed/${newModel.name}/200/300`
     };
 
-    models.push(finalModel);
-    localStorage.setItem('studio_models', JSON.stringify(models));
+    try {
+      // POST directly to backend API — inserts into MySQL `models` table
+      const response = await fetch(`${API_BASE_URL}/add_model.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalModel)
+      });
 
-    setTimeout(() => {
+      if (!response.ok) {
+        throw new Error('সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      }
+
       setSubmitted(true);
-    }, 1000);
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setSubmitError(err?.message || 'রেজিস্ট্রেশন সম্পন্ন হয়নি। দয়া করে আবার চেষ্টা করুন।');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -285,7 +294,23 @@ export default function PublicModelRegistration() {
 
           </div>
 
-          <button type="submit" className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-200 transition-all">রেজিস্টার করুন</button>
+          {submitError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm font-medium">
+              {submitError}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {isSubmitting ? (
+              <><Loader2 size={20} className="mr-2 animate-spin" /> রেজিস্টার হচ্ছে...</>
+            ) : (
+              'রেজিস্টার করুন'
+            )}
+          </button>
         </form>
       </div>
     </div>
