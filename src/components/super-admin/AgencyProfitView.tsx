@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { DollarSign, Plus, Save, TrendingUp, MinusCircle, Trash2 } from 'lucide-react';
 
-const mockProfitVelocity = [
-  { day: '01', profit: 12000 },
-  { day: '02', profit: 15000 },
-  { day: '03', profit: 8000 },
-  { day: '04', profit: 22000 },
-  { day: '05', profit: 18000 },
-  { day: '06', profit: 9000 },
-  { day: '07', profit: 25000 },
-  { day: '08', profit: 28000 },
-  { day: '09', profit: 15000 },
-  { day: '10', profit: 32000 },
-  { day: '11', profit: 14000 },
-  { day: '12', profit: 16000 },
-  { day: '13', profit: 21000 },
-  { day: '14', profit: 19000 },
-  { day: '15', profit: 35000 },
-];
+const EXPENSES_KEY = 'sa_office_expenses';
+const RATES_KEY = 'sa_usd_rates';
+const INJECTIONS_KEY = 'sa_profit_injections';
+
+interface Expense {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+}
+
+interface Injection {
+  id: number;
+  date: string;
+  segment: string;
+  amount: number;
+}
 
 export default function AgencyProfitView() {
   const [injectionForm, setInjectionForm] = useState({
@@ -33,11 +33,8 @@ export default function AgencyProfitView() {
     amount: ''
   });
 
-  const [officeExpenses, setOfficeExpenses] = useState([
-    { id: 1, date: '2026-05-01', description: 'Office Rent & Utilities', amount: 15000 },
-    { id: 2, date: '2026-05-05', description: 'Internet Bill', amount: 2000 },
-    { id: 3, date: '2026-05-08', description: 'Snacks & Others', amount: 3500 },
-  ]);
+  const [officeExpenses, setOfficeExpenses] = useState<Expense[]>([]);
+  const [profitInjections, setProfitInjections] = useState<Injection[]>([]);
 
   const [usdRates, setUsdRates] = useState({
     buyRate: 130,
@@ -45,36 +42,117 @@ export default function AgencyProfitView() {
   });
   const [isEditingRates, setIsEditingRates] = useState(false);
 
+  // Load all data from localStorage on mount
+  useEffect(() => {
+    const savedExpenses = localStorage.getItem(EXPENSES_KEY);
+    if (savedExpenses) {
+      try { setOfficeExpenses(JSON.parse(savedExpenses)); } catch {}
+    }
+
+    const savedRates = localStorage.getItem(RATES_KEY);
+    if (savedRates) {
+      try { setUsdRates(JSON.parse(savedRates)); } catch {}
+    }
+
+    const savedInjections = localStorage.getItem(INJECTIONS_KEY);
+    if (savedInjections) {
+      try { setProfitInjections(JSON.parse(savedInjections)); } catch {}
+    }
+  }, []);
+
+  // Save helpers
+  const saveExpenses = (exps: Expense[]) => {
+    setOfficeExpenses(exps);
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify(exps));
+  };
+
+  const saveRates = (rates: typeof usdRates) => {
+    setUsdRates(rates);
+    localStorage.setItem(RATES_KEY, JSON.stringify(rates));
+  };
+
+  const saveInjections = (inj: Injection[]) => {
+    setProfitInjections(inj);
+    localStorage.setItem(INJECTIONS_KEY, JSON.stringify(inj));
+  };
+
+  // Profit Injection handler — ACTUALLY saves now
   const handleInject = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Profit Injected", injectionForm);
-    alert("Profit record added manually.");
+    if (!injectionForm.date || !injectionForm.segment || !injectionForm.amount) return;
+
+    const newInjection: Injection = {
+      id: Date.now(),
+      date: injectionForm.date,
+      segment: injectionForm.segment,
+      amount: Number(injectionForm.amount)
+    };
+
+    saveInjections([newInjection, ...profitInjections]);
     setInjectionForm({ date: '', segment: '', amount: '' });
+  };
+
+  const handleDeleteInjection = (id: number) => {
+    saveInjections(profitInjections.filter(i => i.id !== id));
   };
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseForm.date || !expenseForm.description || !expenseForm.amount) return;
     
-    setOfficeExpenses([
-      ...officeExpenses,
-      {
-        id: Date.now(),
-        date: expenseForm.date,
-        description: expenseForm.description,
-        amount: Number(expenseForm.amount)
-      }
-    ]);
+    const newExp: Expense = {
+      id: Date.now(),
+      date: expenseForm.date,
+      description: expenseForm.description,
+      amount: Number(expenseForm.amount)
+    };
+    saveExpenses([...officeExpenses, newExp]);
     setExpenseForm({ date: '', description: '', amount: '' });
   };
 
   const handleDeleteExpense = (id: number) => {
-    setOfficeExpenses(officeExpenses.filter(exp => exp.id !== id));
+    saveExpenses(officeExpenses.filter(exp => exp.id !== id));
   };
 
-  const baseProfit = 425500;
+  const handleSaveRates = () => {
+    saveRates(usdRates);
+    setIsEditingRates(false);
+  };
+
+  // ── Calculations ──
+  const grossProfit = profitInjections.reduce((sum, inj) => sum + inj.amount, 0);
   const totalOfficeExpense = officeExpenses.reduce((sum, item) => sum + item.amount, 0);
-  const netProfitMonthly = baseProfit - totalOfficeExpense;
+
+  // Read employee payroll from localStorage
+  const employeesRaw = localStorage.getItem('sa_employees');
+  let totalPayroll = 0;
+  if (employeesRaw) {
+    try {
+      const emps = JSON.parse(employeesRaw);
+      totalPayroll = emps.reduce((sum: number, emp: any) => sum + (emp.baseSalary || 0), 0);
+    } catch {}
+  }
+
+  const totalExpenses = totalOfficeExpense + totalPayroll;
+  const netProfitMonthly = grossProfit - totalExpenses;
+
+  // Build chart data from injections (group by day)
+  const chartData = profitInjections.slice().reverse().reduce((acc: any[], inj) => {
+    const day = inj.date.split('-').pop() || inj.date;
+    const existing = acc.find(d => d.day === day);
+    if (existing) {
+      existing.profit += inj.amount;
+    } else {
+      acc.push({ day, profit: inj.amount });
+    }
+    return acc;
+  }, []).slice(-15);
+
+  // Today's profit
+  const today = new Date().toISOString().split('T')[0];
+  const todaysProfit = profitInjections
+    .filter(i => i.date === today)
+    .reduce((sum, i) => sum + i.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -87,7 +165,7 @@ export default function AgencyProfitView() {
           </div>
           <h3 className="text-sm font-bold text-indigo-200 uppercase tracking-wider mb-2">Total Net Profit</h3>
           <p className="text-3xl font-black mb-1">৳{netProfitMonthly.toLocaleString()}</p>
-          <p className="text-sm font-medium text-indigo-200">After ৳{totalOfficeExpense.toLocaleString()} deduction</p>
+          <p className="text-sm font-medium text-indigo-200">After ৳{totalExpenses.toLocaleString()} deduction</p>
         </div>
 
         <div className="bg-emerald-500 rounded-2xl shadow-sm border border-emerald-600 p-6 text-white relative overflow-hidden group">
@@ -95,23 +173,26 @@ export default function AgencyProfitView() {
             <TrendingUp size={64} />
           </div>
           <h3 className="text-sm font-bold text-emerald-100 uppercase tracking-wider mb-2">Today's Profit</h3>
-          <p className="text-3xl font-black mb-1">৳35,000</p>
-          <p className="text-sm font-medium text-emerald-100">Target: <span className="font-bold text-white">৳40,000</span></p>
+          <p className="text-3xl font-black mb-1">৳{todaysProfit.toLocaleString()}</p>
+          <p className="text-sm font-medium text-emerald-100">
+            {profitInjections.filter(i => i.date === today).length} entries today
+          </p>
         </div>
         
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Gross Profit (Before Exp)</h3>
-          <p className="text-2xl font-black text-gray-900 mb-1">৳{baseProfit.toLocaleString()}</p>
+          <p className="text-2xl font-black text-gray-900 mb-1">৳{grossProfit.toLocaleString()}</p>
           <div className="flex items-center text-sm font-medium text-green-600">
-            <TrendingUp size={16} className="mr-1" /> Top-line Revenue
+            <TrendingUp size={16} className="mr-1" /> {profitInjections.length} records
           </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Office Expenses</h3>
-          <p className="text-2xl font-black text-red-600 mb-1">৳{totalOfficeExpense.toLocaleString()}</p>
-          <div className="flex items-center text-sm font-medium text-red-500">
-            <MinusCircle size={16} className="mr-1" /> Deducted from Gross
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Total Expenses</h3>
+          <p className="text-2xl font-black text-red-600 mb-1">৳{totalExpenses.toLocaleString()}</p>
+          <div className="text-xs text-gray-500 space-y-0.5">
+            <p>Office: ৳{totalOfficeExpense.toLocaleString()}</p>
+            <p>Payroll: ৳{totalPayroll.toLocaleString()}</p>
           </div>
         </div>
 
@@ -119,7 +200,7 @@ export default function AgencyProfitView() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">USD Rates</h3>
             <button 
-              onClick={() => setIsEditingRates(!isEditingRates)}
+              onClick={() => isEditingRates ? handleSaveRates() : setIsEditingRates(true)}
               className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded-md"
             >
               {isEditingRates ? 'Save' : 'Edit'}
@@ -166,11 +247,16 @@ export default function AgencyProfitView() {
         {/* Profit Velocity Chart */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
-            Profit Velocity <span className="text-sm font-medium text-gray-400 ml-2">(Last 15 Days)</span>
+            Profit Velocity <span className="text-sm font-medium text-gray-400 ml-2">(Recent Entries)</span>
           </h3>
+          {chartData.length === 0 ? (
+            <div className="h-72 flex items-center justify-center text-gray-400">
+              <p>কোনো প্রফিট ডাটা নেই। Manual Injection থেকে যোগ করুন।</p>
+            </div>
+          ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockProfitVelocity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
@@ -182,6 +268,7 @@ export default function AgencyProfitView() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          )}
         </div>
 
         {/* Manual Injection Form */}
@@ -234,6 +321,24 @@ export default function AgencyProfitView() {
               <Save size={18} className="mr-2" /> Add Profit
             </button>
           </form>
+
+          {/* Recent Injections */}
+          {profitInjections.length > 0 && (
+            <div className="mt-6 space-y-2">
+              <h4 className="text-xs font-bold text-indigo-800 uppercase">Recent Entries</h4>
+              {profitInjections.slice(0, 5).map(inj => (
+                <div key={inj.id} className="flex justify-between items-center bg-white rounded-lg p-3 border border-indigo-100 text-sm">
+                  <div>
+                    <p className="font-bold text-gray-800">৳{inj.amount.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{inj.date} • {inj.segment}</p>
+                  </div>
+                  <button onClick={() => handleDeleteInjection(inj.id)} className="text-gray-400 hover:text-red-500">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -340,4 +445,3 @@ export default function AgencyProfitView() {
     </div>
   );
 }
-

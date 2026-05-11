@@ -278,6 +278,58 @@ try {
         jsonResponse(['success' => true]);
     }
 
+    // ── Top-Up Payment Proof Upload ──
+    elseif ($path === '/api/upload_topup_proof.php' && $method === 'POST') {
+        if (!isset($_FILES['proof'])) {
+            jsonError('No proof image provided', 400);
+        }
+        
+        $file = $_FILES['proof'];
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        $maxSize = 5 * 1024 * 1024; // 5MB
+        
+        // Validate
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            jsonError('Upload error: ' . $file['error'], 400);
+        }
+        if ($file['size'] > $maxSize) {
+            jsonError('File too large. Maximum 5MB allowed.', 400);
+        }
+        
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($file['tmp_name']);
+        if (!in_array($mimeType, $allowedTypes)) {
+            jsonError('Invalid file type. Only JPG, PNG, WEBP allowed.', 400);
+        }
+        
+        // Generate path: uploads/topup-proofs/2026/05/proof_xxxxx.webp
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) $ext = 'jpg';
+        $year = date('Y');
+        $month = date('m');
+        $filename = 'proof_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        
+        $subDir = "topup-proofs/$year/$month/";
+        $targetDir = UPLOAD_DIR . $subDir;
+        
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+        
+        $targetPath = $targetDir . $filename;
+        
+        if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+            $relativePath = 'uploads/' . $subDir . $filename;
+            jsonResponse([
+                'success' => true,
+                'url' => $relativePath,
+                'filename' => $filename
+            ]);
+        } else {
+            jsonError('Failed to save uploaded file', 500);
+        }
+    }
+
     // ── File Upload ──
     elseif ($path === '/api/upload.php' && $method === 'POST') {
         if (isset($_FILES['file'])) {

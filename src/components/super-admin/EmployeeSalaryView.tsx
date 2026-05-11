@@ -1,21 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, DollarSign, Plus, Minus, FileText, CheckCircle2, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 
-const mockEmployees = [
-  { id: 1, name: 'Rahim Uddin', role: 'FB Ads Expert', baseSalary: 35000, advanceTaken: 5000, currentDue: 30000, status: 'Active', transactions: [{ id: 101, date: '2026-05-02', type: 'Advance', amount: 5000, note: 'Personal Reason' }] },
-  { id: 2, name: 'Karim Hasan', role: 'Web Developer', baseSalary: 45000, advanceTaken: 0, currentDue: 45000, status: 'Active', transactions: [] },
-  { id: 3, name: 'Jannat Ferdous', role: 'UI/UX Designer', baseSalary: 40000, advanceTaken: 15000, currentDue: 25000, status: 'Active', transactions: [{ id: 102, date: '2026-05-05', type: 'Advance', amount: 15000, note: 'Emergency' }] },
-];
+interface Transaction {
+  id: number;
+  date: string;
+  type: string;
+  amount: number;
+  note: string;
+}
+
+interface Employee {
+  id: number;
+  name: string;
+  role: string;
+  baseSalary: number;
+  advanceTaken: number;
+  currentDue: number;
+  status: string;
+  transactions: Transaction[];
+}
+
+const STORAGE_KEY = 'sa_employees';
 
 export default function EmployeeSalaryView() {
-  const [employees, setEmployees] = useState(mockEmployees);
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [actionType, setActionType] = useState<'advance' | 'pay' | 'add' | null>(null);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [actionDate, setActionDate] = useState(new Date().toISOString().split('T')[0]);
   const [newEmployee, setNewEmployee] = useState({ name: '', role: '', baseSalary: '' });
   const [expandedEmpId, setExpandedEmpId] = useState<number | null>(null);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setEmployees(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to load employees', e);
+      }
+    }
+  }, []);
+
+  // Save to localStorage on every change
+  const saveEmployees = (newEmps: Employee[]) => {
+    setEmployees(newEmps);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newEmps));
+  };
 
   const handleAction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +60,7 @@ export default function EmployeeSalaryView() {
       if (!newEmployee.name || !newEmployee.role || !newEmployee.baseSalary) return;
       
       const salary = Number(newEmployee.baseSalary);
-      const newEmp = {
+      const newEmp: Employee = {
         id: Date.now(),
         name: newEmployee.name,
         role: newEmployee.role,
@@ -35,7 +71,7 @@ export default function EmployeeSalaryView() {
         transactions: []
       };
       
-      setEmployees([...employees, newEmp]);
+      saveEmployees([...employees, newEmp]);
       alert('Employee added successfully!');
       setActionType(null);
       setNewEmployee({ name: '', role: '', baseSalary: '' });
@@ -45,7 +81,7 @@ export default function EmployeeSalaryView() {
     if (!selectedEmployee || !amount || !actionDate) return;
 
     const val = Number(amount);
-    const newTransaction = {
+    const newTransaction: Transaction = {
       id: Date.now(),
       date: actionDate,
       type: actionType === 'advance' ? 'Advance' : 'Salary',
@@ -53,7 +89,7 @@ export default function EmployeeSalaryView() {
       note: note || (actionType === 'advance' ? 'Advance Payment' : 'Salary Payment')
     };
     
-    setEmployees(employees.map(emp => {
+    saveEmployees(employees.map(emp => {
       if (emp.id === selectedEmployee.id) {
         if (actionType === 'advance') {
           return {
@@ -81,6 +117,8 @@ export default function EmployeeSalaryView() {
     setActionDate(new Date().toISOString().split('T')[0]);
   };
 
+  const totalPayroll = employees.reduce((acc, emp) => acc + emp.baseSalary, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -93,7 +131,7 @@ export default function EmployeeSalaryView() {
         <div className="text-right">
           <p className="text-sm font-bold text-gray-500 uppercase">Total Monthly Payroll</p>
           <p className="text-3xl font-black text-indigo-700">
-            ৳{employees.reduce((acc, emp) => acc + emp.baseSalary, 0).toLocaleString()}
+            ৳{totalPayroll.toLocaleString()}
           </p>
         </div>
       </div>
@@ -111,6 +149,14 @@ export default function EmployeeSalaryView() {
               <Plus size={16} className="mr-1" /> Add Employee
             </button>
           </div>
+
+          {employees.length === 0 ? (
+            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-12 text-center">
+              <Users className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-bold text-gray-900 mb-1">কোনো এমপ্লয়ি যোগ করা হয়নি</h3>
+              <p className="text-gray-500 text-sm">উপরের "Add Employee" বাটনে ক্লিক করে নতুন এমপ্লয়ি যোগ করুন।</p>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -196,7 +242,7 @@ export default function EmployeeSalaryView() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-50">
-                                {emp.transactions.map((t: any) => (
+                                {emp.transactions.map((t: Transaction) => (
                                   <tr key={t.id}>
                                     <td className="p-2 pl-4 flex items-center text-gray-600 font-medium whitespace-nowrap">
                                       <Calendar size={12} className="mr-1.5" /> {new Date(t.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -224,6 +270,7 @@ export default function EmployeeSalaryView() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {/* Action Panel */}

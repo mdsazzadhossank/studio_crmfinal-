@@ -3,19 +3,14 @@ import { Search, Plus, Anchor, Filter, Star, Wallet, TrendingUp, Tag, MessageSqu
 import SuperAdminClientDetails from './SuperAdminClientDetails';
 import Modal from '../Modal';
 
-const initialMockVipClients = [
-  { id: 101, name: 'Tausif Ahmed', company: 'Global Traders', status: 'active', balance: 125000, totalSpent: 850000, joinDate: '2023-01-15', tags: ['High Priority'], pinnedComment: 'Regular follow-up on 15th', reminder: '', lastUpdate: '' },
-  { id: 102, name: 'Tech Solutions Ltd.', company: 'Tech Solutions', status: 'active', balance: 45000, totalSpent: 1200000, joinDate: '2022-11-20', tags: ['Corporate'], pinnedComment: '', reminder: '', lastUpdate: '' },
-  { id: 103, name: 'Fashion Hub', company: 'E-commerce Group', status: 'hall_of_fame', balance: 0, totalSpent: 2500000, joinDate: '2022-05-10', tags: ['E-com'], pinnedComment: '', reminder: '', lastUpdate: '' },
-  { id: 104, name: 'Rayan Enterprise', company: 'Trading', status: 'active', balance: 350000, totalSpent: 450000, joinDate: '2024-02-01', tags: [], pinnedComment: '', reminder: '', lastUpdate: '' },
-];
+const initialMockVipClients: any[] = [];
 
 export default function BigFishClientsView() {
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
 
-  const [clients, setClients] = useState(initialMockVipClients);
+  const [clients, setClients] = useState<any[]>([]);
   const [editingClientConfig, setEditingClientConfig] = useState<any>(null);
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
@@ -43,8 +38,6 @@ export default function BigFishClientsView() {
       } catch (e) {
         console.error('Failed to load vip clients');
       }
-    } else {
-      setClients(initialMockVipClients);
     }
 
     const savedAll = localStorage.getItem('allClientsData');

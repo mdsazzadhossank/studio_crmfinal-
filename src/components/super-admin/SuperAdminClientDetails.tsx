@@ -2,31 +2,25 @@ import React, { useState } from 'react';
 import { 
   ArrowLeft, Wallet, TrendingUp, DollarSign, ExternalLink, 
   Plus, Minus, Settings, Shield, Ban, Calendar, Activity, 
-  Save, AlertCircle, FileText, Edit2, Trash2, Check, X
+  Save, AlertCircle, FileText, Edit2, Trash2, Check, X,
+  ImageIcon, Eye, Download
 } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
-const initialMockClient = {
-  id: 101,
-  name: 'Tausif Ahmed',
-  company: 'Global Traders',
-  phone: '01712000001',
-  website: 'https://globaltraders.com',
-  fbPage: 'https://facebook.com/globaltraders',
-  notes: 'Top tier VIP client, requires daily reporting.',
-  balance: 125000,
-  adBudgetUsed: 850000,
-  agencyProfit: 152000,
-  ledger: [
-    { id: 1, date: '2026-05-01', desc: 'Initial Deposit', credit: 150000, debit: 0, balance: 150000 },
-    { id: 2, date: '2026-05-05', desc: 'Ad Performance Deduction', credit: 0, debit: 25000, balance: 125000 }
-  ],
-  adHistory: [
-    { id: 1, from: '2026-05-01', to: '2026-05-05', clientBill: 250, actualCost: 200, messageResults: 1500, salesResults: 0, profit: 10250, walletEffect: -36250 }
-  ],
-  topUpRequests: [
-    { id: 1, date: '2026-04-20', amount: 50000, status: 'approved' },
-    { id: 2, date: '2026-05-08', amount: 100000, status: 'pending' }
-  ],
+const emptyClientDefaults = {
+  id: 0,
+  name: '',
+  company: '',
+  phone: '',
+  website: '',
+  fbPage: '',
+  notes: '',
+  balance: 0,
+  adBudgetUsed: 0,
+  agencyProfit: 0,
+  ledger: [] as any[],
+  adHistory: [] as any[],
+  topUpRequests: [] as any[],
   settings: {
     walletBalance: true,
     historyLedger: true,
@@ -42,7 +36,8 @@ const initialMockClient = {
 
 export default function SuperAdminClientDetails({ clientId, onBack }: { clientId: number, onBack: () => void }) {
   const [activeTab, setActiveTab] = useState('wallet');
-  const [client, setClientState] = useState(initialMockClient);
+  const [client, setClientState] = useState(emptyClientDefaults);
+  const [proofModalUrl, setProofModalUrl] = useState('');
 
   React.useEffect(() => {
     const saved = localStorage.getItem('vipClientsData');
@@ -52,12 +47,12 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
         const thisClient = parsed.find((c: any) => c.id === clientId);
         if (thisClient) {
           setClientState({
-            ...initialMockClient,
+            ...emptyClientDefaults,
             ...thisClient,
             ledger: thisClient.ledger || [],
             adHistory: thisClient.adHistory || [],
             topUpRequests: thisClient.topUpRequests || [],
-            settings: thisClient.settings ? { ...initialMockClient.settings, ...thisClient.settings } : initialMockClient.settings
+            settings: thisClient.settings ? { ...emptyClientDefaults.settings, ...thisClient.settings } : emptyClientDefaults.settings
           });
 
           // update profile form on load
@@ -66,7 +61,7 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
             website: thisClient.website || '',
             fbPage: thisClient.fbPage || '',
             notes: thisClient.notes || '',
-            ...(thisClient.settings || initialMockClient.settings)
+            ...(thisClient.settings || emptyClientDefaults.settings)
           });
         }
       } catch (e) {
@@ -75,7 +70,7 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
     }
   }, [clientId]);
 
-  const setClient = (newClientData: typeof initialMockClient) => {
+  const setClient = (newClientData: typeof emptyClientDefaults) => {
     setClientState(newClientData);
     
     // Save to localStorage
@@ -210,7 +205,6 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
       ...client,
       balance: newBalance,
       adBudgetUsed: client.adBudgetUsed + adWalletEffect,
-      agencyProfit: client.agencyProfit + (adProfit * 100),
       adHistory: [newAdRecord, ...client.adHistory],
       ledger: [newLedger, ...client.ledger]
     });
@@ -267,7 +261,6 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
     setClient({
       ...client,
       balance: newBalance,
-      agencyProfit: client.agencyProfit + (diffProfit * 100), // Note: original code multiplies adProfit * 100?
       adHistory: newAdHistory
     });
     setEditingAdHistId(null);
@@ -285,7 +278,6 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
     setClient({
       ...client,
       balance: newBalance,
-      agencyProfit: client.agencyProfit - (item.profit * 100),
       adHistory: newHistory
     });
   };
@@ -385,7 +377,7 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={64} className="text-emerald-500" /></div>
           <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Agency Profit</h3>
-          <p className="text-3xl font-black text-emerald-600">৳{client.agencyProfit.toLocaleString()}</p>
+          <p className="text-3xl font-black text-emerald-600">৳{(client.adHistory || []).reduce((sum: number, h: any) => sum + (h.profit || 0), 0).toLocaleString()}</p>
         </div>
       </div>
 
@@ -611,15 +603,49 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
                   <tr className="border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold pb-2">
                     <th className="p-3">Date</th>
                     <th className="p-3">Requested Amount</th>
+                    <th className="p-3">Proof</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {client.topUpRequests.map((req) => (
+                  {client.topUpRequests.map((req) => {
+                    const backendBase = API_BASE_URL.replace(/\/api$/, '');
+                    const proofFullUrl = req.paymentProof ? `${backendBase}/${req.paymentProof}` : '';
+                    return (
                     <tr key={req.id} className="border-b border-gray-50 text-sm font-medium text-gray-800 hover:bg-gray-50/50">
                       <td className="p-3 text-gray-500">{req.date}</td>
                       <td className="p-3 font-bold text-gray-900">৳{req.amount.toLocaleString()}</td>
+                      <td className="p-3">
+                        {req.paymentProof ? (
+                          <div className="flex items-center gap-2">
+                            <img 
+                              src={proofFullUrl}
+                              alt="proof"
+                              className="w-10 h-10 rounded-lg object-cover border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => setProofModalUrl(proofFullUrl)}
+                            />
+                            <button
+                              onClick={() => setProofModalUrl(proofFullUrl)}
+                              className="text-indigo-600 hover:text-indigo-800 p-1"
+                              title="View proof"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <a
+                              href={proofFullUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-500 hover:text-gray-700 p-1"
+                              title="Download"
+                            >
+                              <Download size={16} />
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">No proof</span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                           req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -636,15 +662,47 @@ export default function SuperAdminClientDetails({ clientId, onBack }: { clientId
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {client.topUpRequests.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="p-6 text-center text-gray-500 font-medium">No top-up requests found.</td>
+                      <td colSpan={5} className="p-6 text-center text-gray-500 font-medium">No top-up requests found.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Proof Image Lightbox Modal */}
+            {proofModalUrl && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setProofModalUrl('')}>
+                <div className="relative max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                    <h4 className="font-bold text-gray-800 flex items-center"><ImageIcon size={18} className="mr-2 text-indigo-500" /> Payment Proof</h4>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={proofModalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
+                        title="Open in new tab"
+                      >
+                        <Download size={18} />
+                      </a>
+                      <button
+                        onClick={() => setProofModalUrl('')}
+                        className="p-2 bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded-lg text-gray-600 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <img src={proofModalUrl} alt="Payment proof full" className="max-w-full max-h-[75vh] object-contain mx-auto rounded-lg" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
