@@ -1,0 +1,42 @@
+RewriteEngine On
+
+# Redirect all requests to api/index.php (our front controller)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ api/index.php [QSA,L]
+
+# Security: Deny access to sensitive files
+<FilesMatch "\.(env|sql|md|json|log)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to config/models/controllers directories directly
+<IfModule mod_rewrite.c>
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^models/ - [F,L]
+    RewriteRule ^controllers/ - [F,L]
+    RewriteRule ^middleware/ - [F,L]
+    RewriteRule ^helpers/ - [F,L]
+    RewriteRule ^database/ - [F,L]
+</IfModule>
+
+# Enable CORS preflight
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Max-Age "3600"
+</IfModule>
+
+# Handle OPTIONS preflight
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ api/index.php [QSA,L]
+
+# PHP Settings
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 50M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+</IfModule>

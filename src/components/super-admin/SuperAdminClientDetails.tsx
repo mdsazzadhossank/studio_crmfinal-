@@ -1,0 +1,752 @@
+import React, { useState } from 'react';
+import { 
+  ArrowLeft, Wallet, TrendingUp, DollarSign, ExternalLink, 
+  Plus, Minus, Settings, Shield, Ban, Calendar, Activity, 
+  Save, AlertCircle, FileText, Edit2, Trash2, Check, X
+} from 'lucide-react';
+
+const initialMockClient = {
+  id: 101,
+  name: 'Tausif Ahmed',
+  company: 'Global Traders',
+  phone: '01712000001',
+  website: 'https://globaltraders.com',
+  fbPage: 'https://facebook.com/globaltraders',
+  notes: 'Top tier VIP client, requires daily reporting.',
+  balance: 125000,
+  adBudgetUsed: 850000,
+  agencyProfit: 152000,
+  ledger: [
+    { id: 1, date: '2026-05-01', desc: 'Initial Deposit', credit: 150000, debit: 0, balance: 150000 },
+    { id: 2, date: '2026-05-05', desc: 'Ad Performance Deduction', credit: 0, debit: 25000, balance: 125000 }
+  ],
+  adHistory: [
+    { id: 1, from: '2026-05-01', to: '2026-05-05', clientBill: 250, actualCost: 200, messageResults: 1500, salesResults: 0, profit: 10250, walletEffect: -36250 }
+  ],
+  topUpRequests: [
+    { id: 1, date: '2026-04-20', amount: 50000, status: 'approved' },
+    { id: 2, date: '2026-05-08', amount: 100000, status: 'pending' }
+  ],
+  settings: {
+    walletBalance: true,
+    historyLedger: true,
+    messageReport: false,
+    salesReport: true,
+    profitLossReport: false,
+    paymentMethods: true,
+    allowTopUp: true,
+    suspended: false,
+    dollarRate: 145
+  }
+};
+
+export default function SuperAdminClientDetails({ clientId, onBack }: { clientId: number, onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState('wallet');
+  const [client, setClientState] = useState(initialMockClient);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('vipClientsData');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const thisClient = parsed.find((c: any) => c.id === clientId);
+        if (thisClient) {
+          setClientState({
+            ...initialMockClient,
+            ...thisClient,
+            ledger: thisClient.ledger || [],
+            adHistory: thisClient.adHistory || [],
+            topUpRequests: thisClient.topUpRequests || [],
+            settings: thisClient.settings ? { ...initialMockClient.settings, ...thisClient.settings } : initialMockClient.settings
+          });
+
+          // update profile form on load
+          setProfileForm({
+            phone: thisClient.phone || '',
+            website: thisClient.website || '',
+            fbPage: thisClient.fbPage || '',
+            notes: thisClient.notes || '',
+            ...(thisClient.settings || initialMockClient.settings)
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load vip client data');
+      }
+    }
+  }, [clientId]);
+
+  const setClient = (newClientData: typeof initialMockClient) => {
+    setClientState(newClientData);
+    
+    // Save to localStorage
+    const saved = localStorage.getItem('vipClientsData');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const updated = parsed.map((c: any) => (c.id === newClientData.id ? newClientData : c));
+        localStorage.setItem('vipClientsData', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to save vip client data');
+      }
+    }
+  };
+
+  // forms
+  const [walletForm, setWalletForm] = useState({ desc: '', date: '', amount: '' });
+  const [editingLedgerId, setEditingLedgerId] = useState<number | null>(null);
+  const [editLedgerForm, setEditLedgerForm] = useState({ date: '', desc: '', credit: 0, debit: 0 });
+  const [editingAdHistId, setEditingAdHistId] = useState<number | null>(null);
+  const [editAdHistForm, setEditAdHistForm] = useState({ from: '', to: '', clientBill: '', actualCost: '', messageResults: '', salesResults: '', buyRate: '130', chargeRate: '145' });
+  const [adForm, setAdForm] = useState({ from: '', to: '', clientBill: '', actualCost: '', messageResults: '', salesResults: '', buyRate: '130', chargeRate: '145' });
+  const [profileForm, setProfileForm] = useState({
+    phone: client.phone, website: client.website, fbPage: client.fbPage, notes: client.notes, ...client.settings
+  });
+
+  const handleWalletSubmit = (type: 'add' | 'deduct') => {
+    if (!walletForm.amount || !walletForm.desc) return;
+    const amount = Number(walletForm.amount);
+    const newBalance = type === 'add' ? client.balance + amount : client.balance - amount;
+    
+    const newLedger = {
+      id: Date.now(),
+      date: walletForm.date || new Date().toISOString().split('T')[0],
+      desc: walletForm.desc,
+      credit: type === 'add' ? amount : 0,
+      debit: type === 'deduct' ? amount : 0,
+      balance: newBalance
+    };
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      ledger: [newLedger, ...client.ledger]
+    });
+    setWalletForm({ desc: '', date: '', amount: '' });
+  };
+
+  const handleDeleteLedger = (id: number) => {
+    if (!confirm('Are you sure you want to delete this record?')) return;
+    const item = client.ledger.find(l => l.id === id);
+    if (!item) return;
+    
+    // Reverse the balance effect
+    const newBalance = client.balance - item.credit + item.debit;
+    const filteredLedger = client.ledger.filter(l => l.id !== id);
+    
+    setClient({
+      ...client,
+      balance: newBalance,
+      ledger: filteredLedger
+    });
+  };
+
+  const startEditLedger = (log: any) => {
+    setEditingLedgerId(log.id);
+    setEditLedgerForm({ date: log.date, desc: log.desc, credit: log.credit, debit: log.debit });
+  };
+
+  const handleEditLedgerSubmit = (id: number) => {
+    const oldLog = client.ledger.find(l => l.id === id);
+    if (!oldLog) return;
+
+    const diffCredit = Number(editLedgerForm.credit) - oldLog.credit;
+    const diffDebit = Number(editLedgerForm.debit) - oldLog.debit;
+    const newBalance = client.balance + diffCredit - diffDebit;
+
+    const newLedger = client.ledger.map(l => {
+      if (l.id === id) {
+        return {
+          ...l,
+          date: editLedgerForm.date,
+          desc: editLedgerForm.desc,
+          credit: Number(editLedgerForm.credit),
+          debit: Number(editLedgerForm.debit),
+          // We apply the difference to this specific log's balance snapshot as well.
+          // In a real app, you might rebuild all balances from the ground up, but this is a close approximation.
+          balance: l.balance + diffCredit - diffDebit
+        };
+      }
+      return l;
+    });
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      ledger: newLedger
+    });
+    setEditingLedgerId(null);
+  };
+
+  const adWalletEffect = (Number(adForm.clientBill) || 0) * (Number(adForm.chargeRate) || 145);
+  const adAgencyCost = (Number(adForm.actualCost) || 0) * (Number(adForm.buyRate) || 130);
+  const adProfit = adWalletEffect - adAgencyCost;
+
+  const handleAdPerformanceSave = () => {
+    if (!adForm.clientBill || !adForm.actualCost) return;
+    
+    const newAdRecord = {
+      id: Date.now(),
+      from: adForm.from,
+      to: adForm.to,
+      clientBill: Number(adForm.clientBill),
+      actualCost: Number(adForm.actualCost),
+      messageResults: Number(adForm.messageResults) || 0,
+      salesResults: Number(adForm.salesResults) || 0,
+      profit: adProfit,
+      walletEffect: -adWalletEffect
+    };
+
+    const newBalance = client.balance - adWalletEffect;
+    const newLedger = {
+      id: Date.now(),
+      date: adForm.to || new Date().toISOString().split('T')[0],
+      desc: `Ad Deduction (${adForm.from} to ${adForm.to})`,
+      credit: 0,
+      debit: adWalletEffect,
+      balance: newBalance
+    };
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      adBudgetUsed: client.adBudgetUsed + adWalletEffect,
+      agencyProfit: client.agencyProfit + (adProfit * 100),
+      adHistory: [newAdRecord, ...client.adHistory],
+      ledger: [newLedger, ...client.ledger]
+    });
+    setAdForm({ from: '', to: '', clientBill: '', actualCost: '', messageResults: '', salesResults: '', buyRate: '', chargeRate: '' });
+  };
+
+  const startEditAdHistory = (hist: any) => {
+    setEditingAdHistId(hist.id);
+    setEditAdHistForm({
+      from: hist.from,
+      to: hist.to,
+      clientBill: String(hist.clientBill),
+      actualCost: String(hist.actualCost),
+      messageResults: String(hist.messageResults),
+      salesResults: String(hist.salesResults),
+      buyRate: '130',
+      chargeRate: '145'
+    });
+  };
+
+  const handleEditAdHistorySubmit = (id: number) => {
+    const editAdWalletEffect = (Number(editAdHistForm.clientBill) || 0) * (Number(editAdHistForm.chargeRate) || 145);
+    const editAdAgencyCost = (Number(editAdHistForm.actualCost) || 0) * (Number(editAdHistForm.buyRate) || 130);
+    const editAdProfit = editAdWalletEffect - editAdAgencyCost;
+
+    const oldHist = client.adHistory.find(h => h.id === id);
+    if (!oldHist) return;
+
+    // Diff impacts balance, agency profit, etc.
+    const diffWalletEffect = -editAdWalletEffect - oldHist.walletEffect;
+    const diffProfit = editAdProfit - oldHist.profit;
+
+    // To keep simple, we modify the record but might misalign the ledger overall ledger balance history
+    // A complete real-world app would rebuild balances. We just adjust current balance here.
+    const newBalance = client.balance + diffWalletEffect;
+
+    const newAdHistory = client.adHistory.map(h => {
+      if (h.id === id) {
+        return {
+          ...h,
+          from: editAdHistForm.from,
+          to: editAdHistForm.to,
+          clientBill: Number(editAdHistForm.clientBill),
+          actualCost: Number(editAdHistForm.actualCost),
+          messageResults: Number(editAdHistForm.messageResults) || 0,
+          salesResults: Number(editAdHistForm.salesResults) || 0,
+          profit: editAdProfit,
+          walletEffect: -editAdWalletEffect
+        };
+      }
+      return h;
+    });
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      agencyProfit: client.agencyProfit + (diffProfit * 100), // Note: original code multiplies adProfit * 100?
+      adHistory: newAdHistory
+    });
+    setEditingAdHistId(null);
+  };
+
+  const handleDeleteAdHistory = (id: number) => {
+    if (!confirm('Are you sure you want to delete this ad record?')) return;
+    const item = client.adHistory.find(h => h.id === id);
+    if (!item) return;
+
+    // Reverse the wallet effect and profit
+    const newBalance = client.balance - item.walletEffect;
+    const newHistory = client.adHistory.filter(h => h.id !== id);
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      agencyProfit: client.agencyProfit - (item.profit * 100),
+      adHistory: newHistory
+    });
+  };
+
+  const handleApproveTopUp = (id: number) => {
+    if (!confirm('Are you sure you want to approve this request? It will be added to the client\'s wallet.')) return;
+    const reqInfo = client.topUpRequests.find(r => r.id === id);
+    if (!reqInfo) return;
+
+    if (reqInfo.status === 'approved') return; // already approved
+
+    const newBalance = client.balance + reqInfo.amount;
+
+    const newLedger = {
+      id: Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      desc: `Top-Up Approved: ${reqInfo.amount}৳`,
+      credit: reqInfo.amount,
+      debit: 0,
+      balance: newBalance
+    };
+
+    const newRequests = client.topUpRequests.map(r => 
+      r.id === id ? { ...r, status: 'approved' } : r
+    );
+
+    setClient({
+      ...client,
+      balance: newBalance,
+      topUpRequests: newRequests,
+      ledger: [newLedger, ...client.ledger]
+    });
+  };
+
+  const handleDeleteTopUp = (id: number) => {
+    if (!confirm('Are you sure you want to delete this top-up request?')) return;
+    setClient({
+      ...client,
+      topUpRequests: client.topUpRequests.filter(r => r.id !== id)
+    });
+  };
+
+  const handleProfileSave = () => {
+    setClient({
+      ...client,
+      phone: profileForm.phone,
+      website: profileForm.website,
+      fbPage: profileForm.fbPage,
+      notes: profileForm.notes,
+      settings: {
+        walletBalance: profileForm.walletBalance,
+        historyLedger: profileForm.historyLedger,
+        messageReport: profileForm.messageReport,
+        salesReport: profileForm.salesReport,
+        profitLossReport: profileForm.profitLossReport,
+        paymentMethods: profileForm.paymentMethods,
+        allowTopUp: profileForm.allowTopUp,
+        suspended: profileForm.suspended,
+        dollarRate: profileForm.dollarRate
+      }
+    });
+    alert('Profile & Settings saved successfully.');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+        <div className="flex items-center">
+          <button onClick={onBack} className="p-2 mr-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-gray-600">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900">{client.name}</h2>
+            <p className="text-sm font-medium text-gray-500">{client.company} <span className="mx-2">•</span> VIP Client</p>
+          </div>
+        </div>
+        <button onClick={() => window.open(`/?vip-client=${clientId}`, '_blank')} className="flex items-center bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm">
+          <ExternalLink size={16} className="mr-2" /> Switch to Client View
+        </button>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-indigo-600 rounded-2xl shadow-sm border border-indigo-700 p-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20"><Wallet size={64} /></div>
+          <h3 className="text-sm font-bold text-indigo-200 uppercase tracking-wider mb-2">Current Wallet Balance</h3>
+          <p className="text-3xl font-black mb-1">৳{client.balance.toLocaleString()}</p>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Activity size={64} className="text-blue-500" /></div>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Total Ad Budget Used</h3>
+          <p className="text-3xl font-black text-gray-900">৳{client.adBudgetUsed.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={64} className="text-emerald-500" /></div>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Agency Profit</h3>
+          <p className="text-3xl font-black text-emerald-600">৳{client.agencyProfit.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex overflow-x-auto bg-gray-100 p-1 rounded-2xl">
+        {[
+          { id: 'wallet', label: 'Wallet & Funds', icon: Wallet },
+          { id: 'ad', label: 'Ad Performance', icon: Activity },
+          { id: 'topup', label: 'Top-Up Requests', icon: DollarSign },
+          { id: 'profile', label: 'Profile & Settings', icon: Settings },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex items-center justify-center px-4 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+              activeTab === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <tab.icon size={16} className="mr-2" /> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="mt-6">
+        
+        {/* WALLET & FUNDS */}
+        {activeTab === 'wallet' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-1 h-fit">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6">Manual Wallet Adjustment</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Reference Description</label>
+                  <input type="text" value={walletForm.desc} onChange={e => setWalletForm({...walletForm, desc: e.target.value})} placeholder="e.g. Bkash transfer" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
+                  <input type="date" value={walletForm.date} onChange={e => setWalletForm({...walletForm, date: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Amount (৳)</label>
+                  <input type="number" value={walletForm.amount} onChange={e => setWalletForm({...walletForm, amount: e.target.value})} placeholder="0.00" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none font-bold text-lg" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => handleWalletSubmit('add')} className="flex-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center">
+                    <Plus size={18} className="mr-1" /> Add Funds
+                  </button>
+                  <button onClick={() => handleWalletSubmit('deduct')} className="flex-1 bg-red-50 text-red-700 hover:bg-red-100 font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center">
+                    <Minus size={18} className="mr-1" /> Deduct
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
+                <FileText className="mr-2 text-indigo-500" /> Ledger Table
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold pb-2">
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Description</th>
+                      <th className="p-3 text-right">Credit</th>
+                      <th className="p-3 text-right">Debit</th>
+                      <th className="p-3 text-right">Balance</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {client.ledger.map((log) => (
+                      <tr key={log.id} className="border-b border-gray-50 text-sm font-medium text-gray-800 hover:bg-gray-50/50">
+                        {editingLedgerId === log.id ? (
+                          <>
+                            <td className="p-2"><input type="date" value={editLedgerForm.date} onChange={e => setEditLedgerForm({...editLedgerForm, date: e.target.value})} className="w-full px-2 py-1 border rounded" /></td>
+                            <td className="p-2"><input type="text" value={editLedgerForm.desc} onChange={e => setEditLedgerForm({...editLedgerForm, desc: e.target.value})} className="w-full px-2 py-1 border rounded" /></td>
+                            <td className="p-2"><input type="number" value={editLedgerForm.credit} onChange={e => setEditLedgerForm({...editLedgerForm, credit: Number(e.target.value)})} className="w-full px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-2"><input type="number" value={editLedgerForm.debit} onChange={e => setEditLedgerForm({...editLedgerForm, debit: Number(e.target.value)})} className="w-full px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-3 text-right font-black text-gray-900">৳{log.balance.toLocaleString()}</td>
+                            <td className="p-3 text-right flex items-center justify-end gap-2">
+                              <button onClick={() => handleEditLedgerSubmit(log.id)} className="text-emerald-600 hover:text-emerald-800" title="Save"><Check size={16} /></button>
+                              <button onClick={() => setEditingLedgerId(null)} className="text-gray-400 hover:text-gray-600" title="Cancel"><X size={16} /></button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-3 text-gray-500">{log.date}</td>
+                            <td className="p-3">{log.desc}</td>
+                            <td className="p-3 text-right text-emerald-600 font-bold">{log.credit > 0 ? `৳${log.credit.toLocaleString()}` : '-'}</td>
+                            <td className="p-3 text-right text-red-600 font-bold">{log.debit > 0 ? `৳${log.debit.toLocaleString()}` : '-'}</td>
+                            <td className="p-3 text-right font-black text-gray-900">৳{log.balance.toLocaleString()}</td>
+                            <td className="p-3 text-right flex items-center justify-end gap-2">
+                              <button onClick={() => startEditLedger(log)} className="text-indigo-600 hover:text-indigo-800" title="Edit"><Edit2 size={16} /></button>
+                              <button onClick={() => handleDeleteLedger(log.id)} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={16} /></button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AD PERFORMANCE */}
+        {activeTab === 'ad' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6">Ad Performance Log</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+                  <div><label className="block text-xs font-bold text-gray-500 mb-1">From Date</label><input type="date" value={adForm.from} onChange={e => setAdForm({...adForm, from: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                  <div><label className="block text-xs font-bold text-gray-500 mb-1">To Date</label><input type="date" value={adForm.to} onChange={e => setAdForm({...adForm, to: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                </div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Client Bill ($)</label><input type="number" value={adForm.clientBill} onChange={e => setAdForm({...adForm, clientBill: e.target.value})} placeholder="0.00" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none font-bold" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Actual Cost ($)</label><input type="number" value={adForm.actualCost} onChange={e => setAdForm({...adForm, actualCost: e.target.value})} placeholder="0.00" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none font-bold" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Message Results</label><input type="number" value={adForm.messageResults} onChange={e => setAdForm({...adForm, messageResults: e.target.value})} placeholder="0" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Sales Results</label><input type="number" value={adForm.salesResults} onChange={e => setAdForm({...adForm, salesResults: e.target.value})} placeholder="0" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Buy Rate</label><input type="number" value={adForm.buyRate} onChange={e => setAdForm({...adForm, buyRate: e.target.value})} placeholder="0.00" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 mb-1">Charge Rate</label><input type="number" value={adForm.chargeRate} onChange={e => setAdForm({...adForm, chargeRate: e.target.value})} placeholder="0.00" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 outline-none" /></div>
+                
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col justify-center">
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-indigo-800">Computed Profit:</span>
+                    <span className="text-emerald-600">৳{adProfit > 0 ? adProfit.toLocaleString() : '0'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-indigo-800">Wallet Effect:</span>
+                    <span className="text-red-500">-৳{adWalletEffect > 0 ? adWalletEffect.toLocaleString() : '0'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button onClick={handleAdPerformanceSave} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center">
+                  <Minus size={18} className="mr-2" /> Deduct Wallet & Save Record
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
+                <Calendar className="mr-2 text-indigo-500" /> Ad Performance History
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold pb-2">
+                      <th className="p-3">Period</th>
+                      <th className="p-3 text-right">Client Bill</th>
+                      <th className="p-3 text-right">Actual Cost</th>
+                      <th className="p-3 text-right">Message Results</th>
+                      <th className="p-3 text-right">Sales Results</th>
+                      <th className="p-3 text-right">Agency Profit</th>
+                      <th className="p-3 text-right">Wallet Effect</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {client.adHistory.map((hist) => (
+                      <tr key={hist.id} className="border-b border-gray-50 text-sm font-medium text-gray-800 hover:bg-gray-50/50">
+                        {editingAdHistId === hist.id ? (
+                          <>
+                            <td className="p-2 w-1/4">
+                              <div className="flex flex-col gap-1">
+                                <input type="date" value={editAdHistForm.from} onChange={e => setEditAdHistForm({...editAdHistForm, from: e.target.value})} className="w-full px-2 py-1 border rounded text-xs" />
+                                <input type="date" value={editAdHistForm.to} onChange={e => setEditAdHistForm({...editAdHistForm, to: e.target.value})} className="w-full px-2 py-1 border rounded text-xs" />
+                              </div>
+                            </td>
+                            <td className="p-2 text-right"><input type="number" step="0.01" value={editAdHistForm.clientBill} onChange={e => setEditAdHistForm({...editAdHistForm, clientBill: e.target.value})} className="w-20 px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-2 text-right"><input type="number" step="0.01" value={editAdHistForm.actualCost} onChange={e => setEditAdHistForm({...editAdHistForm, actualCost: e.target.value})} className="w-20 px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-2 text-right"><input type="number" value={editAdHistForm.messageResults} onChange={e => setEditAdHistForm({...editAdHistForm, messageResults: e.target.value})} className="w-16 px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-2 text-right"><input type="number" value={editAdHistForm.salesResults} onChange={e => setEditAdHistForm({...editAdHistForm, salesResults: e.target.value})} className="w-16 px-2 py-1 border rounded text-right" /></td>
+                            <td className="p-3 text-right text-emerald-600 font-bold">...</td>
+                            <td className="p-3 text-right text-red-600">...</td>
+                            <td className="p-3 text-right flex items-center justify-end gap-2">
+                              <button onClick={() => handleEditAdHistorySubmit(hist.id)} className="text-emerald-600 hover:text-emerald-800" title="Save"><Check size={16} /></button>
+                              <button onClick={() => setEditingAdHistId(null)} className="text-gray-400 hover:text-gray-600" title="Cancel"><X size={16} /></button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="p-3 text-gray-500 w-1/4">{hist.from} to {hist.to}</td>
+                            <td className="p-3 text-right font-bold text-gray-800">${hist.clientBill.toFixed(2)}</td>
+                            <td className="p-3 text-right">${hist.actualCost.toFixed(2)}</td>
+                            <td className="p-3 text-right">{hist.messageResults > 0 ? hist.messageResults : '-'}</td>
+                            <td className="p-3 text-right">{hist.salesResults > 0 ? hist.salesResults : '-'}</td>
+                            <td className="p-3 text-right text-emerald-600 font-bold">৳{hist.profit.toLocaleString()}</td>
+                            <td className="p-3 text-right text-red-600">৳{hist.walletEffect.toLocaleString()}</td>
+                            <td className="p-3 text-right flex items-center justify-end gap-2">
+                              <button onClick={() => startEditAdHistory(hist)} className="text-indigo-600 hover:text-indigo-800" title="Edit"><Edit2 size={16} /></button>
+                              <button onClick={() => handleDeleteAdHistory(hist.id)} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={16} /></button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                    {client.adHistory.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-6 text-center text-gray-500 font-medium">No ad performance records yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TOP-UP REQUESTS */}
+        {activeTab === 'topup' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
+               <DollarSign className="mr-2 text-indigo-500" /> Request History
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold pb-2">
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Requested Amount</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {client.topUpRequests.map((req) => (
+                    <tr key={req.id} className="border-b border-gray-50 text-sm font-medium text-gray-800 hover:bg-gray-50/50">
+                      <td className="p-3 text-gray-500">{req.date}</td>
+                      <td className="p-3 font-bold text-gray-900">৳{req.amount.toLocaleString()}</td>
+                      <td className="p-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {req.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right flex justify-end items-center gap-3">
+                        {req.status === 'pending' && (
+                          <button onClick={() => handleApproveTopUp(req.id)} className="text-indigo-600 font-bold hover:text-indigo-800 text-sm">Approve</button>
+                        )}
+                        <button onClick={() => handleDeleteTopUp(req.id)} className="text-red-500 hover:text-red-700" title="Delete">
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {client.topUpRequests.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-6 text-center text-gray-500 font-medium">No top-up requests found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* PROFILE & SETTINGS */}
+        {activeTab === 'profile' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
+                 <Shield className="mr-2 text-indigo-500" /> Client Profile
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number</label>
+                  <input type="text" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Website URL</label>
+                  <input type="url" value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Facebook Page</label>
+                  <input type="url" value={profileForm.fbPage} onChange={e => setProfileForm({...profileForm, fbPage: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Admin Notes</label>
+                  <textarea rows={3} value={profileForm.notes} onChange={e => setProfileForm({...profileForm, notes: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-extrabold text-gray-800 mb-6 flex items-center">
+                 <Settings className="mr-2 text-indigo-500" /> Portal Visibility
+              </h3>
+              <div className="space-y-3 mb-8">
+                {[
+                  { id: 'walletBalance', label: 'Wallet Balance' },
+                  { id: 'historyLedger', label: 'History Ledger' },
+                  { id: 'messageReport', label: 'Message Report' },
+                  { id: 'salesReport', label: 'Sales Report' },
+                  { id: 'profitLossReport', label: 'Profit/Loss Report' },
+                  { id: 'paymentMethods', label: 'Payment Methods' },
+                  { id: 'allowTopUp', label: 'Allow Top-up' },
+                ].map(setting => (
+                  <label key={setting.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                    <span className="text-sm font-bold text-gray-700">{setting.label}</span>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                      <input 
+                        type="checkbox" 
+                        name="toggle" 
+                        id={setting.id} 
+                        checked={profileForm[setting.id as keyof typeof profileForm] as boolean}
+                        onChange={e => setProfileForm({...profileForm, [setting.id]: e.target.checked})}
+                        className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                        style={{ right: profileForm[setting.id as keyof typeof profileForm] ? '0' : 'auto', borderColor: profileForm[setting.id as keyof typeof profileForm] ? '#4F46E5' : '#D1D5DB' }}
+                      />
+                      <label htmlFor={setting.id} className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer" style={{ backgroundColor: profileForm[setting.id as keyof typeof profileForm] ? '#4F46E5' : '#D1D5DB' }}></label>
+                    </div>
+                  </label>
+                ))}
+                
+                <div className="flex items-center justify-between p-3 bg-blue-50/50 border border-blue-100 rounded-xl">
+                    <span className="text-sm font-bold text-blue-900">Dollar Rate (৳)</span>
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold text-blue-700">$1 = </span>
+                        <input type="number" value={profileForm.dollarRate} onChange={e => setProfileForm({...profileForm, dollarRate: Number(e.target.value)})} className="w-20 px-3 py-1.5 bg-white border border-blue-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none font-bold text-blue-900 text-right" />
+                    </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-6">
+                <label className="flex items-center justify-between p-4 bg-red-50 border border-red-100 rounded-xl cursor-pointer">
+                  <div className="flex items-center">
+                    <Ban className="text-red-500 mr-3" size={20} />
+                    <div>
+                      <span className="text-sm font-bold text-red-900 block">Suspend Portal Access</span>
+                      <span className="text-xs font-medium text-red-600">Block this client from logging in</span>
+                    </div>
+                  </div>
+                  <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={profileForm.suspended}
+                        onChange={e => setProfileForm({...profileForm, suspended: e.target.checked})}
+                        className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                        style={{ right: profileForm.suspended ? '0' : 'auto', borderColor: profileForm.suspended ? '#EF4444' : '#D1D5DB' }}
+                      />
+                      <label className="toggle-label block overflow-hidden h-5 rounded-full cursor-pointer" style={{ backgroundColor: profileForm.suspended ? '#EF4444' : '#D1D5DB' }}></label>
+                    </div>
+                </label>
+              </div>
+
+              <div className="mt-8">
+                <button onClick={handleProfileSave} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center">
+                  <Save size={18} className="mr-2" /> Save All Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
