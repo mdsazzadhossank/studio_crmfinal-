@@ -5,8 +5,8 @@ import './index.css';
 
 import { API_BASE_URL } from './config';
 
-// Auth keys that must NEVER be globally synced — they are browser-specific
-const AUTH_LOCAL_KEYS = ['studio_auth_current_user', 'studio_auth_users'];
+// Keys that must NEVER be globally synced — they are browser-specific or role-sensitive
+const AUTH_LOCAL_KEYS = ['studio_auth_current_user', 'studio_auth_users', 'studio_task_manager'];
 
 async function initApp() {
   try {

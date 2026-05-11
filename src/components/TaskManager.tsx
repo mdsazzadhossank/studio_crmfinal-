@@ -45,7 +45,7 @@ export default function TaskManager() {
       user_id: currentUser?.id || '',
       user_name: currentUser?.name || '',
     });
-    fetch(`${API_BASE_URL}/get_tasks.php?${params}`)
+    fetch(`${API_BASE_URL}/get_tasks?${params}`)
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(apiTasks => {
         if (Array.isArray(apiTasks)) {
@@ -106,7 +106,7 @@ export default function TaskManager() {
     setNewTaskAssignedTo('');
 
     // Persist to MySQL tasks table
-    fetch(`${API_BASE_URL}/add_task.php`, {
+    fetch(`${API_BASE_URL}/add_task`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTask)
@@ -122,7 +122,7 @@ export default function TaskManager() {
     setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
 
     // Persist to MySQL
-    fetch(`${API_BASE_URL}/update_task.php`, {
+    fetch(`${API_BASE_URL}/update_task`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status: newStatus })
@@ -135,7 +135,7 @@ export default function TaskManager() {
       setTasks(tasks.filter(t => t.id !== id));
 
       // Delete from MySQL
-      fetch(`${API_BASE_URL}/delete_task.php`, {
+      fetch(`${API_BASE_URL}/delete_task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })

@@ -118,7 +118,7 @@ export default function VipClientPortal({ clientId }: { clientId: string }) {
       formData.append('proof', proofFile);
 
       const backendBase = API_BASE_URL.replace(/\/api$/, '');
-      const uploadRes = await fetch(`${API_BASE_URL}/upload_topup_proof.php`, {
+      const uploadRes = await fetch(`${API_BASE_URL}/upload_topup_proof`, {
         method: 'POST',
         body: formData,
       });

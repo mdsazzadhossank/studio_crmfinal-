@@ -8,9 +8,10 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(email, password);
+    setError('');
+    const success = await login(email, password);
     if (!success) {
       setError('ভুল ইমেইল বা পাসওয়ার্ড');
     }

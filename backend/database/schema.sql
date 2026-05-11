@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `title` VARCHAR(500) NOT NULL,
   `description` TEXT DEFAULT NULL,
   `assigned_to` VARCHAR(50) DEFAULT '',
+  `created_by` VARCHAR(50) DEFAULT '',
   `status` VARCHAR(50) DEFAULT 'todo',
   `priority` VARCHAR(50) DEFAULT 'normal',
   `due_date` DATE DEFAULT NULL,
@@ -257,7 +258,9 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_tasks_status` (`status`)
+  KEY `idx_tasks_status` (`status`),
+  KEY `idx_tasks_assigned_to` (`assigned_to`),
+  KEY `idx_tasks_created_by` (`created_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

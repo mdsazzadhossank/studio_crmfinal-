@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // On mount, fetch users from the MySQL users table
   useEffect(() => {
-    fetch(`${API_BASE_URL}/get_users.php`)
+    fetch(`${API_BASE_URL}/get_users`)
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(apiUsers => {
         if (Array.isArray(apiUsers) && apiUsers.length > 0) {
@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => [...prev, newUser]);
 
     // Persist to MySQL users table
-    fetch(`${API_BASE_URL}/add_user.php`, {
+    fetch(`${API_BASE_URL}/add_user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user)
@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Persist to MySQL users table
-    fetch(`${API_BASE_URL}/update_user.php`, {
+    fetch(`${API_BASE_URL}/update_user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updatedFields })
@@ -173,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(users.filter(u => u.id !== id));
 
     // Delete from MySQL users table
-    fetch(`${API_BASE_URL}/delete_user.php`, {
+    fetch(`${API_BASE_URL}/delete_user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id })

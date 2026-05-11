@@ -23,9 +23,13 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Session
 if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.cookie_httponly', 1);
-    ini_set('session.cookie_samesite', 'Lax');
-    session_set_cookie_params(SESSION_LIFETIME);
+    session_set_cookie_params([
+        'lifetime' => SESSION_LIFETIME,
+        'path' => '/',
+        'secure' => isset($_SERVER['HTTPS']) || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
     session_start();
 }
 
@@ -55,6 +59,9 @@ if (!str_starts_with($path, '/api/')) {
 
 // Clean path
 $path = '/' . trim($path, '/');
+
+// Strip .php extension from path (routes work with or without .php)
+$path = preg_replace('/\.php$/', '', $path);
 
 // ── Load Controllers ──
 require_once __DIR__ . '/../controllers/StoreController.php';
@@ -109,51 +116,51 @@ try {
     }
 
     // ── Client Endpoints (matches api.ts) ──
-    elseif ($path === '/api/get_clients.php' && $method === 'GET') {
+    elseif ($path === '/api/get_clients' && $method === 'GET') {
         ClientController::getAll();
     }
-    elseif ($path === '/api/add_client.php' && $method === 'POST') {
+    elseif ($path === '/api/add_client' && $method === 'POST') {
         ClientController::create();
     }
-    elseif ($path === '/api/update_client.php' && $method === 'POST') {
+    elseif ($path === '/api/update_client' && $method === 'POST') {
         ClientController::update();
     }
-    elseif ($path === '/api/delete_client.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_client' && $method === 'POST') {
         ClientController::delete();
     }
 
     // ── Project Endpoints ──
-    elseif ($path === '/api/add_project.php' && $method === 'POST') {
+    elseif ($path === '/api/add_project' && $method === 'POST') {
         ProjectController::create();
     }
-    elseif ($path === '/api/update_project.php' && $method === 'POST') {
+    elseif ($path === '/api/update_project' && $method === 'POST') {
         ProjectController::update();
     }
-    elseif ($path === '/api/delete_project.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_project' && $method === 'POST') {
         ProjectController::delete();
     }
 
     // ── Model Endpoints ──
-    elseif ($path === '/api/get_models.php' && $method === 'GET') {
+    elseif ($path === '/api/get_models' && $method === 'GET') {
         ModelController::getAll();
     }
-    elseif ($path === '/api/add_model.php' && $method === 'POST') {
+    elseif ($path === '/api/add_model' && $method === 'POST') {
         ModelController::create();
     }
 
     // ── Invoice Endpoints ──
-    elseif ($path === '/api/get_invoices.php' && $method === 'GET') {
+    elseif ($path === '/api/get_invoices' && $method === 'GET') {
         InvoiceController::getAll();
     }
-    elseif ($path === '/api/add_invoice.php' && $method === 'POST') {
+    elseif ($path === '/api/add_invoice' && $method === 'POST') {
         InvoiceController::create();
     }
-    elseif ($path === '/api/delete_invoice.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_invoice' && $method === 'POST') {
         InvoiceController::delete();
     }
 
     // ── Content Endpoints ──
-    elseif ($path === '/api/get_content.php' && $method === 'GET') {
+    elseif ($path === '/api/get_content' && $method === 'GET') {
         $db = Database::getConnection();
         $content = $db->query("SELECT * FROM content ORDER BY created_at DESC")->fetchAll();
         foreach ($content as &$c) {
@@ -163,7 +170,7 @@ try {
         }
         jsonResponse($content);
     }
-    elseif ($path === '/api/add_content.php' && $method === 'POST') {
+    elseif ($path === '/api/add_content' && $method === 'POST') {
         $data = getJsonBody();
         $db = Database::getConnection();
         $id = 'ct' . round(microtime(true) * 1000);
@@ -186,20 +193,20 @@ try {
     }
 
     // ── Schedule Endpoints ──
-    elseif ($path === '/api/get_schedule.php' && $method === 'GET') {
+    elseif ($path === '/api/get_schedule' && $method === 'GET') {
         ScheduleController::getAll();
     }
-    elseif ($path === '/api/add_schedule.php' && $method === 'POST') {
+    elseif ($path === '/api/add_schedule' && $method === 'POST') {
         ScheduleController::create();
     }
 
     // ── Categories Endpoints ──
-    elseif ($path === '/api/get_categories.php' && $method === 'GET') {
+    elseif ($path === '/api/get_categories' && $method === 'GET') {
         $db = Database::getConnection();
         $cats = $db->query("SELECT name FROM categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
         jsonResponse($cats);
     }
-    elseif ($path === '/api/add_category.php' && $method === 'POST') {
+    elseif ($path === '/api/add_category' && $method === 'POST') {
         $data = getJsonBody();
         if (is_array($data) && !empty($data['category'])) {
             $db = Database::getConnection();
@@ -210,51 +217,51 @@ try {
     }
 
     // ── Employee Endpoints ──
-    elseif ($path === '/api/get_employees.php' && $method === 'GET') {
+    elseif ($path === '/api/get_employees' && $method === 'GET') {
         EmployeeController::getAll();
     }
-    elseif ($path === '/api/add_employee.php' && $method === 'POST') {
+    elseif ($path === '/api/add_employee' && $method === 'POST') {
         EmployeeController::create();
     }
-    elseif ($path === '/api/update_employee.php' && $method === 'POST') {
+    elseif ($path === '/api/update_employee' && $method === 'POST') {
         EmployeeController::update();
     }
-    elseif ($path === '/api/delete_employee.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_employee' && $method === 'POST') {
         EmployeeController::delete();
     }
 
     // ── Lead Endpoints ──
-    elseif ($path === '/api/get_leads.php' && $method === 'GET') {
+    elseif ($path === '/api/get_leads' && $method === 'GET') {
         LeadController::getAll();
     }
-    elseif ($path === '/api/add_lead.php' && $method === 'POST') {
+    elseif ($path === '/api/add_lead' && $method === 'POST') {
         LeadController::create();
     }
-    elseif ($path === '/api/delete_lead.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_lead' && $method === 'POST') {
         LeadController::delete();
     }
 
     // ── User Management Endpoints ──
-    elseif ($path === '/api/get_users.php' && $method === 'GET') {
+    elseif ($path === '/api/get_users' && $method === 'GET') {
         UserController::getAll();
     }
-    elseif ($path === '/api/add_user.php' && $method === 'POST') {
+    elseif ($path === '/api/add_user' && $method === 'POST') {
         UserController::create();
     }
-    elseif ($path === '/api/update_user.php' && $method === 'POST') {
+    elseif ($path === '/api/update_user' && $method === 'POST') {
         UserController::update();
     }
-    elseif ($path === '/api/delete_user.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_user' && $method === 'POST') {
         UserController::delete();
     }
 
     // ── Daily Tasks ──
-    elseif ($path === '/api/get_daily_tasks.php' && $method === 'GET') {
+    elseif ($path === '/api/get_daily_tasks' && $method === 'GET') {
         $db = Database::getConnection();
         $tasks = $db->query("SELECT * FROM daily_tasks ORDER BY date_key DESC, step_id ASC")->fetchAll();
         jsonResponse($tasks);
     }
-    elseif ($path === '/api/save_daily_task.php' && $method === 'POST') {
+    elseif ($path === '/api/save_daily_task' && $method === 'POST') {
         $data = getJsonBody();
         if (is_array($data)) {
             $db = Database::getConnection();
@@ -279,7 +286,7 @@ try {
     }
 
     // ── Task Manager CRUD (role-based) ──
-    elseif ($path === '/api/get_tasks.php' && $method === 'GET') {
+    elseif ($path === '/api/get_tasks' && $method === 'GET') {
         $db = Database::getConnection();
         $role = $_GET['role'] ?? '';
         $userId = $_GET['user_id'] ?? '';
@@ -314,7 +321,7 @@ try {
         }, $tasks);
         jsonResponse($formatted);
     }
-    elseif ($path === '/api/add_task.php' && $method === 'POST') {
+    elseif ($path === '/api/add_task' && $method === 'POST') {
         $data = getJsonBody();
         if (!is_array($data) || empty($data['title'])) {
             jsonError('Task title is required', 400);
@@ -342,7 +349,7 @@ try {
         ]);
         jsonResponse(['success' => true, 'id' => $id], 201);
     }
-    elseif ($path === '/api/update_task.php' && $method === 'POST') {
+    elseif ($path === '/api/update_task' && $method === 'POST') {
         $data = getJsonBody();
         if (!is_array($data) || empty($data['id'])) {
             jsonError('Task ID is required', 400);
@@ -364,7 +371,7 @@ try {
         }
         jsonResponse(['success' => true]);
     }
-    elseif ($path === '/api/delete_task.php' && $method === 'POST') {
+    elseif ($path === '/api/delete_task' && $method === 'POST') {
         $data = getJsonBody();
         if (!is_array($data) || empty($data['id'])) {
             jsonError('Task ID is required', 400);
@@ -375,7 +382,7 @@ try {
     }
 
     // ── Top-Up Payment Proof Upload ──
-    elseif ($path === '/api/upload_topup_proof.php' && $method === 'POST') {
+    elseif ($path === '/api/upload_topup_proof' && $method === 'POST') {
         if (!isset($_FILES['proof'])) {
             jsonError('No proof image provided', 400);
         }
@@ -427,7 +434,7 @@ try {
     }
 
     // ── File Upload ──
-    elseif ($path === '/api/upload.php' && $method === 'POST') {
+    elseif ($path === '/api/upload' && $method === 'POST') {
         if (isset($_FILES['file'])) {
             $result = handleFileUpload($_FILES['file'], 'uploads');
             if ($result) {
@@ -445,6 +452,64 @@ try {
                 }
             }
             jsonError('No file provided', 400);
+        }
+    }
+
+    // ── Database Migration (auto-create tables + seed admin) ──
+    elseif ($path === '/api/migrate' && $method === 'GET') {
+        try {
+            $db = Database::getConnection();
+            
+            // Run schema.sql if it exists
+            $schemaFile = __DIR__ . '/../database/schema.sql';
+            if (file_exists($schemaFile)) {
+                $sql = file_get_contents($schemaFile);
+                // Remove CREATE DATABASE and USE statements (PDO already connects to the right DB)
+                $sql = preg_replace('/CREATE\s+DATABASE\s+.*?;/si', '', $sql);
+                $sql = preg_replace('/USE\s+`?[^;]+`?\s*;/si', '', $sql);
+                // Remove INSERT INTO users (we handle admin seeding separately with proper bcrypt)
+                $sql = preg_replace('/INSERT\s+INTO\s+`?users`?\s+.*?;/si', '', $sql);
+                $db->exec($sql);
+            }
+            
+            // Check if admin password is correct (bcrypt hash), fix if needed
+            $admin = $db->query("SELECT id, password FROM users WHERE email = 'admin' LIMIT 1")->fetch();
+            if ($admin) {
+                if (!password_verify('admin', $admin['password'])) {
+                    // Fix the admin password with proper bcrypt hash
+                    $hash = password_hash('admin', PASSWORD_DEFAULT);
+                    $stmt = $db->prepare("UPDATE users SET password = :pass WHERE id = :id");
+                    $stmt->execute([':pass' => $hash, ':id' => $admin['id']]);
+                    jsonResponse(['success' => true, 'message' => 'Migration complete. Admin password fixed.']);
+                } else {
+                    jsonResponse(['success' => true, 'message' => 'Migration complete. Everything OK.']);
+                }
+            } else {
+                // Seed default admin
+                $adminId = 'u1';
+                $hashedPassword = password_hash('admin', PASSWORD_DEFAULT);
+                $permissions = json_encode(["dashboard","projects","clients","all-clients","website","automation","course","marketing","models","scheduling","lead","invoice","daily-tasks","terms","task-manager","portfolio","employees","website-info","users","messages"]);
+                $projectPermissions = json_encode(["project-financials","project-scripts","project-content","project-links","project-dates","project-team"]);
+                
+                $stmt = $db->prepare(
+                    "INSERT INTO users (id, name, email, password, role, is_super_admin, permissions, project_permissions) 
+                     VALUES (:id, :name, :email, :pass, :role, :isa, :perms, :pperms)"
+                );
+                $stmt->execute([
+                    ':id' => $adminId,
+                    ':name' => 'Super Admin',
+                    ':email' => 'admin',
+                    ':pass' => $hashedPassword,
+                    ':role' => 'admin',
+                    ':isa' => 1,
+                    ':perms' => $permissions,
+                    ':pperms' => $projectPermissions,
+                ]);
+                
+                jsonResponse(['success' => true, 'message' => 'Migration complete. Admin user created.']);
+            }
+        } catch (Exception $e) {
+            jsonError('Migration failed: ' . $e->getMessage(), 500);
         }
     }
 

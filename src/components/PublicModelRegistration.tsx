@@ -114,7 +114,7 @@ export default function PublicModelRegistration() {
 
     try {
       // POST directly to backend API — inserts into MySQL `models` table
-      const response = await fetch(`${API_BASE_URL}/add_model.php`, {
+      const response = await fetch(`${API_BASE_URL}/add_model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalModel)
