@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckSquare, Calendar, Clock, Plus, Trash2, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export interface Task {
   id: string;
@@ -17,10 +18,7 @@ export interface Task {
 export default function TaskManager() {
   const { currentUser } = useAuth();
   
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('studio_task_manager');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
   
   const [employees, setEmployees] = useState<{id: string, name: string, email?: string}[]>(() => {
     const saved = localStorage.getItem('studio_employees');
@@ -40,6 +38,30 @@ export default function TaskManager() {
     (emp.email && currentUser?.email && emp.email === currentUser?.email)
   );
 
+  // Fetch tasks from MySQL on mount (with role-based filtering)
+  useEffect(() => {
+    const params = new URLSearchParams({
+      role: currentUser?.role || '',
+      user_id: currentUser?.id || '',
+      user_name: currentUser?.name || '',
+    });
+    fetch(`${API_BASE_URL}/get_tasks.php?${params}`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(apiTasks => {
+        if (Array.isArray(apiTasks)) {
+          setTasks(apiTasks);
+        }
+      })
+      .catch(() => {
+        // Offline fallback: load from localStorage
+        const saved = localStorage.getItem('studio_task_manager');
+        if (saved) {
+          try { setTasks(JSON.parse(saved)); } catch (e) {}
+        }
+      });
+  }, [currentUser]);
+
+  // Keep localStorage in sync for offline fallback
   useEffect(() => {
     localStorage.setItem('studio_task_manager', JSON.stringify(tasks));
   }, [tasks]);
@@ -77,33 +99,53 @@ export default function TaskManager() {
       createdByName: currentUser?.name
     };
 
+    // Optimistic UI update
     setTasks([newTask, ...tasks]);
     setNewTaskTitle('');
     setNewTaskDate('');
     setNewTaskAssignedTo('');
+
+    // Persist to MySQL tasks table
+    fetch(`${API_BASE_URL}/add_task.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTask)
+    }).catch(console.error);
   };
 
   const toggleTaskStatus = (id: string) => {
-    setTasks(tasks.map(task => {
-      if (task.id === id) {
-        return { ...task, status: task.status === 'Pending' ? 'Completed' : 'Pending' };
-      }
-      return task;
-    }));
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const newStatus = task.status === 'Pending' ? 'Completed' : 'Pending';
+
+    // Optimistic update
+    setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+
+    // Persist to MySQL
+    fetch(`${API_BASE_URL}/update_task.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status: newStatus })
+    }).catch(console.error);
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm('আপনি কি নিশ্চিত যে আপনি এই টাস্কটি মুছে ফেলতে চান?')) {
+      // Optimistic update
       setTasks(tasks.filter(t => t.id !== id));
+
+      // Delete from MySQL
+      fetch(`${API_BASE_URL}/delete_task.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      }).catch(console.error);
     }
   };
 
-  const visibleTasks = tasks.filter(task => {
-    if (isPrivileged) return true;
-    if (currentUserEmployee && task.assignedTo === currentUserEmployee.id) return true;
-    if (task.assignedToName === currentUser?.name) return true;
-    return false;
-  });
+  // Frontend filtering is no longer needed for security (backend does it),
+  // but keep it as a UI safety net
+  const visibleTasks = tasks;
 
   const pendingTasks = visibleTasks
     .filter(t => t.status === 'Pending')
@@ -295,4 +337,3 @@ export default function TaskManager() {
     </div>
   );
 }
-

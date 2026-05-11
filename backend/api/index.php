@@ -278,6 +278,102 @@ try {
         jsonResponse(['success' => true]);
     }
 
+    // ── Task Manager CRUD (role-based) ──
+    elseif ($path === '/api/get_tasks.php' && $method === 'GET') {
+        $db = Database::getConnection();
+        $role = $_GET['role'] ?? '';
+        $userId = $_GET['user_id'] ?? '';
+        $userName = $_GET['user_name'] ?? '';
+
+        if ($role === 'admin' || $role === 'manager') {
+            // Admin/Manager sees ALL tasks
+            $tasks = $db->query("SELECT * FROM tasks ORDER BY created_at DESC")->fetchAll();
+        } else {
+            // Regular user sees only tasks assigned to them
+            $stmt = $db->prepare(
+                "SELECT * FROM tasks WHERE assigned_to = :uid OR assigned_to = :uname OR assigned_to = '' ORDER BY created_at DESC"
+            );
+            $stmt->execute([':uid' => $userId, ':uname' => $userName]);
+            $tasks = $stmt->fetchAll();
+        }
+
+        // Format for frontend
+        $formatted = array_map(function($t) {
+            $data = json_decode($t['data'] ?? '{}', true) ?: [];
+            return [
+                'id' => $t['id'],
+                'title' => $t['title'],
+                'assignedTo' => $data['assignedTo'] ?? $t['assigned_to'] ?? '',
+                'assignedToName' => $data['assignedToName'] ?? 'Unassigned',
+                'dueDate' => $t['due_date'] ?? '',
+                'status' => $t['status'] === 'Completed' ? 'Completed' : 'Pending',
+                'createdAt' => $t['created_at'],
+                'createdByRole' => $data['createdByRole'] ?? '',
+                'createdByName' => $data['createdByName'] ?? '',
+            ];
+        }, $tasks);
+        jsonResponse($formatted);
+    }
+    elseif ($path === '/api/add_task.php' && $method === 'POST') {
+        $data = getJsonBody();
+        if (!is_array($data) || empty($data['title'])) {
+            jsonError('Task title is required', 400);
+        }
+        $db = Database::getConnection();
+        $id = $data['id'] ?? 'task_' . round(microtime(true) * 1000);
+        $stmt = $db->prepare(
+            "INSERT INTO tasks (id, title, description, assigned_to, status, priority, due_date, data) 
+             VALUES (:id, :title, :desc, :assigned_to, :status, :priority, :due_date, :data)"
+        );
+        $stmt->execute([
+            ':id' => $id,
+            ':title' => $data['title'],
+            ':desc' => $data['description'] ?? '',
+            ':assigned_to' => $data['assignedTo'] ?? '',
+            ':status' => $data['status'] ?? 'Pending',
+            ':priority' => $data['priority'] ?? 'normal',
+            ':due_date' => $data['dueDate'] ?? null,
+            ':data' => json_encode([
+                'assignedTo' => $data['assignedTo'] ?? '',
+                'assignedToName' => $data['assignedToName'] ?? 'Unassigned',
+                'createdByRole' => $data['createdByRole'] ?? '',
+                'createdByName' => $data['createdByName'] ?? '',
+            ]),
+        ]);
+        jsonResponse(['success' => true, 'id' => $id], 201);
+    }
+    elseif ($path === '/api/update_task.php' && $method === 'POST') {
+        $data = getJsonBody();
+        if (!is_array($data) || empty($data['id'])) {
+            jsonError('Task ID is required', 400);
+        }
+        $db = Database::getConnection();
+        $fields = [];
+        $params = [':id' => $data['id']];
+        if (isset($data['status'])) {
+            $fields[] = "status = :status";
+            $params[':status'] = $data['status'];
+        }
+        if (isset($data['title'])) {
+            $fields[] = "title = :title";
+            $params[':title'] = $data['title'];
+        }
+        if (!empty($fields)) {
+            $sql = "UPDATE tasks SET " . implode(', ', $fields) . " WHERE id = :id";
+            $db->prepare($sql)->execute($params);
+        }
+        jsonResponse(['success' => true]);
+    }
+    elseif ($path === '/api/delete_task.php' && $method === 'POST') {
+        $data = getJsonBody();
+        if (!is_array($data) || empty($data['id'])) {
+            jsonError('Task ID is required', 400);
+        }
+        $db = Database::getConnection();
+        $db->prepare("DELETE FROM tasks WHERE id = :id")->execute([':id' => $data['id']]);
+        jsonResponse(['success' => true]);
+    }
+
     // ── Top-Up Payment Proof Upload ──
     elseif ($path === '/api/upload_topup_proof.php' && $method === 'POST') {
         if (!isset($_FILES['proof'])) {
