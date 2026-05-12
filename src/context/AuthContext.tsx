@@ -144,13 +144,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user)
     })
-      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(async res => {
+        if (!res.ok) {
+           const err = await res.json().catch(()=>({}));
+           throw new Error(err.error || 'Failed to add user');
+        }
+        return res.json();
+      })
       .then(savedUser => {
         // Replace temp user with the real one from DB (correct ID + hashed password)
         setUsers(prev => prev.map(u => u.id === tempId ? savedUser : u));
       })
-      .catch(() => {
-        // If API fails, keep the optimistic local version
+      .catch((error) => {
+        alert("ইউজার অ্যাড করতে সমস্যা হয়েছে: " + error.message);
+        // If API fails, remove the optimistic local version
+        setUsers(prev => prev.filter(u => u.id !== tempId));
       });
   };
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { LayoutDashboard, Users, Camera, Image as ImageIcon, Calendar, Briefcase, FileText, Upload, X, ClipboardList, Shield, LogOut, UserPlus, MessageSquare, Clock, Globe, Laptop, Settings, BookOpen, TrendingUp, Video } from 'lucide-react';
+import { LayoutDashboard, Users, Camera, Image as ImageIcon, Calendar, Briefcase, FileText, Upload, X, ClipboardList, Shield, LogOut, UserPlus, MessageSquare, Clock, Globe, Laptop, Settings, BookOpen, TrendingUp, Video, Cloud } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 type SidebarProps = {
@@ -119,6 +119,7 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
 
   if (currentUser?.isSuperAdmin) {
     adminSection.items.push({ id: 'super-admin-features', label: 'সুপার এডমিন ফিচার', icon: Shield });
+    adminSection.items.push({ id: 'cloud-backup', label: 'ক্লাউড ব্যাকআপ', icon: Cloud });
   }
 
   const sections = sectionedTabsRaw.map(sec => {

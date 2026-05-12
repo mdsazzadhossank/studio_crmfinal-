@@ -58,7 +58,9 @@ define('SESSION_LIFETIME', (int)env('SESSION_LIFETIME', 86400)); // 24 hours
 // ── Error Reporting ──
 if (APP_DEBUG) {
     error_reporting(E_ALL);
-    ini_set('display_errors', '1');
+    ini_set('display_errors', '0'); // Never display errors on screen for JSON APIs
+    ini_set('log_errors', '1');
+    ini_set('error_log', __DIR__ . '/../error.log');
 } else {
     error_reporting(0);
     ini_set('display_errors', '0');

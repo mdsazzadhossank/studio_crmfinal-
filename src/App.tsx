@@ -26,6 +26,7 @@ import Messages from './components/Messages';
 import PublicOnboardingForm from './components/PublicOnboardingForm';
 import ClientOnboarding from './components/ClientOnboarding';
 import SuperAdminFeatures from './components/SuperAdminFeatures';
+import CloudBackup from './components/super-admin/CloudBackup';
 import PublicModelRegistration from './components/PublicModelRegistration';
 import CompanyPad from './components/CompanyPad';
 import { DataProvider } from './context/DataContext';
@@ -157,6 +158,8 @@ function AppContent() {
         return <UserManagement />;
       case 'super-admin-features':
         return <SuperAdminFeatures />;
+      case 'cloud-backup':
+        return <CloudBackup />;
       default:
         return <Dashboard />;
     }

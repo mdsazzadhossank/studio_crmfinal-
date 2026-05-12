@@ -21,6 +21,13 @@ class UserController {
             if (!is_array($data) || empty($data['name']) || empty($data['email'])) {
                 jsonError('Name and email are required', 400);
             }
+            
+            // Check if email already exists to prevent 500 duplicate key error
+            $existing = User::findByEmail($data['email']);
+            if ($existing) {
+                jsonError('A user with this email already exists', 400);
+            }
+            
             $user = User::create($data);
             $formatted = User::formatForFrontend($user);
             jsonResponse($formatted, 201);

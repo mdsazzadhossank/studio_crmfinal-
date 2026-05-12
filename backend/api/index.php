@@ -74,6 +74,7 @@ require_once __DIR__ . '/../controllers/EmployeeController.php';
 require_once __DIR__ . '/../controllers/LeadController.php';
 require_once __DIR__ . '/../controllers/ScheduleController.php';
 require_once __DIR__ . '/../controllers/UserController.php';
+require_once __DIR__ . '/../controllers/BackupController.php';
 
 // ============================================================
 // ROUTE DEFINITIONS
@@ -253,6 +254,14 @@ try {
     }
     elseif ($path === '/api/delete_user' && $method === 'POST') {
         UserController::delete();
+    }
+
+    // ── Backup System ──
+    elseif ($path === '/api/backup/run' && $method === 'POST') {
+        BackupController::run();
+    }
+    elseif ($path === '/api/backup/history' && $method === 'GET') {
+        BackupController::getHistory();
     }
 
     // ── Daily Tasks ──
@@ -470,6 +479,18 @@ try {
                 // Remove INSERT INTO users (we handle admin seeding separately with proper bcrypt)
                 $sql = preg_replace('/INSERT\s+INTO\s+`?users`?\s+.*?;/si', '', $sql);
                 $db->exec($sql);
+            }
+            
+            // Auto-migrate missing columns in users table
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN project_permissions JSON DEFAULT NULL");
+            } catch (Exception $e) {
+                // Column might already exist, ignore error
+            }
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN permissions JSON DEFAULT NULL");
+            } catch (Exception $e) {
+                // Column might already exist, ignore error
             }
             
             // Check if admin password is correct (bcrypt hash), fix if needed

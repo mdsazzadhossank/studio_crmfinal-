@@ -375,5 +375,24 @@ INSERT IGNORE INTO `categories` (`name`) VALUES
 ('Fashion'), ('Commercial'), ('Product'), ('Event');
 
 -- ============================================================
+-- ============================================================
+-- 20. BACKUP LOGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `backup_logs` (
+  `id` VARCHAR(50) NOT NULL,
+  `filename` VARCHAR(255) NOT NULL,
+  `backup_type` VARCHAR(50) DEFAULT 'full',
+  `google_drive_file_id` VARCHAR(255) DEFAULT NULL,
+  `google_drive_url` VARCHAR(1000) DEFAULT NULL,
+  `backup_size` VARCHAR(50) DEFAULT NULL,
+  `backup_status` ENUM('pending', 'success', 'failed') NOT NULL DEFAULT 'pending',
+  `created_by` VARCHAR(50) DEFAULT NULL,
+  `error_message` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_backup_logs_status` (`backup_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- Done! Schema creation complete.
 -- ============================================================

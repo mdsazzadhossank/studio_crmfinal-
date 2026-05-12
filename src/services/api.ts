@@ -43,6 +43,10 @@ export const api = {
   getCategories: () => fetchApi<string[]>('/get_categories'),
   getInvoices: () => fetchApi<Invoice[]>('/get_invoices'),
   getDailyTasks: () => fetchApi<any>('/get_daily_tasks'),
+  
+  // Backup endpoints
+  getBackupHistory: () => fetchApi<any[]>('/backup/history'),
+  runBackup: () => fetchApi<{success: boolean, message?: string, drive_url?: string, backup_size?: string, error?: string}>('/backup/run', { method: 'POST' }),
 
   // POST Requests (আপনার PHP ফাইলগুলো JSON ডাটা রিসিভ করে ডাটাবেজে সেভ করবে)
   addClient: (data: Omit<Client, 'id' | 'projects'>) => 
