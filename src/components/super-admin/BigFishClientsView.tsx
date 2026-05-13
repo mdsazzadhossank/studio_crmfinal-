@@ -30,11 +30,32 @@ export default function BigFishClientsView() {
   const [isCatchFishModalOpen, setIsCatchFishModalOpen] = useState(false);
   const [allGeneralClients, setAllGeneralClients] = useState<any[]>([]);
 
+  // Sanitize a client record to guarantee required string/number fields exist
+  const sanitizeClient = (c: any): any => {
+    if (!c || typeof c !== 'object') return null;
+    return {
+      ...c,
+      id: c.id || Date.now(),
+      name: c.name || '',
+      company: c.company || '',
+      status: c.status || 'active',
+      balance: Number(c.balance) || 0,
+      totalSpent: Number(c.totalSpent) || 0,
+      tags: Array.isArray(c.tags) ? c.tags.filter((t: any) => typeof t === 'string') : [],
+      pinnedComment: c.pinnedComment || '',
+      reminder: c.reminder || '',
+      lastUpdate: c.lastUpdate || '',
+    };
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('vipClientsData');
     if (saved) {
       try {
-        setClients(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setClients(parsed.map(sanitizeClient).filter(Boolean));
+        }
       } catch (e) {
         console.error('Failed to load vip clients');
       }
@@ -43,7 +64,10 @@ export default function BigFishClientsView() {
     const savedAll = localStorage.getItem('allClientsData');
     if (savedAll) {
       try {
-        setAllGeneralClients(JSON.parse(savedAll));
+        const parsed = JSON.parse(savedAll);
+        if (Array.isArray(parsed)) {
+          setAllGeneralClients(parsed.filter((c: any) => c && typeof c === 'object'));
+        }
       } catch (e) {
         console.error('Failed to load all clients');
       }
@@ -112,8 +136,9 @@ export default function BigFishClientsView() {
   };
 
   const handleCatchFish = (generalClient: any) => {
-    // Check if already exists in VIP
-    if (clients.some(c => c.name.toLowerCase() === generalClient.name.toLowerCase() || c.id === generalClient.id)) {
+    // Check if already exists in VIP (null-safe)
+    const incomingName = (generalClient.name || '').toLowerCase();
+    if (clients.some(c => (c.name || '').toLowerCase() === incomingName || c.id === generalClient.id)) {
       alert("This client is already a VIP!");
       return;
     }
@@ -150,12 +175,15 @@ export default function BigFishClientsView() {
     return <SuperAdminClientDetails clientId={selectedClientId} onBack={() => setSelectedClientId(null)} />;
   }
 
-  const filteredClients = clients.filter(c => 
-    (activeTab === 'all' || c.status === activeTab) &&
-    (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     (c.tags || []).some((t: string) => t.toLowerCase().includes(searchQuery.toLowerCase())))
-  );
+  const searchLower = searchQuery.toLowerCase();
+  const filteredClients = clients.filter(c => {
+    if (!c || typeof c !== 'object') return false;
+    const matchesTab = activeTab === 'all' || c.status === activeTab;
+    const nameMatch = (c.name || '').toLowerCase().includes(searchLower);
+    const companyMatch = (c.company || '').toLowerCase().includes(searchLower);
+    const tagMatch = (Array.isArray(c.tags) ? c.tags : []).some((t: any) => (typeof t === 'string' ? t : '').toLowerCase().includes(searchLower));
+    return matchesTab && (nameMatch || companyMatch || tagMatch);
+  });
 
   return (
     <div className="space-y-6">
@@ -248,7 +276,7 @@ export default function BigFishClientsView() {
 
             <div className="flex items-start mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-blue-100 border border-indigo-200 rounded-2xl flex items-center justify-center text-xl font-black text-indigo-700 mr-4 shrink-0 shadow-sm">
-                {client.name.charAt(0)}
+                {(client.name || '?').charAt(0)}
               </div>
               <div className="pt-1 flex-1 pr-6">
                 {editingNameId === client.id ? (
@@ -314,13 +342,13 @@ export default function BigFishClientsView() {
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                   <Wallet size={12} className="mr-1" /> Wallet Balance
                 </p>
-                <p className="text-lg font-black text-gray-900">৳{(client.balance).toLocaleString()}</p>
+                <p className="text-lg font-black text-gray-900">৳{(client.balance || 0).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                   <TrendingUp size={12} className="mr-1" /> Total Spent
                 </p>
-                <p className="text-lg font-black text-indigo-600">৳{(client.totalSpent).toLocaleString()}</p>
+                <p className="text-lg font-black text-indigo-600">৳{(client.totalSpent || 0).toLocaleString()}</p>
               </div>
             </div>
             

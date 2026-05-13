@@ -91,16 +91,26 @@ export default function GeneralClientsView() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) return;
         // Migration: Update existing demo clients with full info data if they are missing it
-        const updated = parsed.map((c: any) => {
-          if (c.id === 'demo1' && (!c.info || !c.info.bizCategory)) {
-            return initialGeneralClients[0];
-          }
-          if (c.id === 'demo2' && (!c.info || !c.info.bizCategory)) {
-            return initialGeneralClients[1];
-          }
-          return c;
-        });
+        const updated = parsed
+          .filter((c: any) => c && typeof c === 'object')
+          .map((c: any) => {
+            if (c.id === 'demo1' && (!c.info || !c.info.bizCategory)) {
+              return initialGeneralClients[0];
+            }
+            if (c.id === 'demo2' && (!c.info || !c.info.bizCategory)) {
+              return initialGeneralClients[1];
+            }
+            // Sanitize: ensure required string fields exist
+            return {
+              ...c,
+              name: c.name || '',
+              company: c.company || '',
+              phone: c.phone || '',
+              tags: Array.isArray(c.tags) ? c.tags.filter((t: any) => typeof t === 'string') : [],
+            };
+          });
         setClients(updated);
         localStorage.setItem('generalClientsData', JSON.stringify(updated));
       } catch (e) {
@@ -180,11 +190,14 @@ export default function GeneralClientsView() {
     });
   };
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.tags || []).some((t: string) => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const searchLower = searchQuery.toLowerCase();
+  const filteredClients = clients.filter(c => {
+    if (!c || typeof c !== 'object') return false;
+    const nameMatch = (c.name || '').toLowerCase().includes(searchLower);
+    const companyMatch = (c.company || '').toLowerCase().includes(searchLower);
+    const tagMatch = (Array.isArray(c.tags) ? c.tags : []).some((t: any) => (typeof t === 'string' ? t : '').toLowerCase().includes(searchLower));
+    return nameMatch || companyMatch || tagMatch;
+  });
 
   return (
     <div className="space-y-6">
@@ -250,7 +263,7 @@ export default function GeneralClientsView() {
 
             <div className="flex items-start mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl flex items-center justify-center text-xl font-black text-indigo-700 mr-4 shrink-0 shadow-sm">
-                {client.name.charAt(0)}
+                {(client.name || '?').charAt(0)}
               </div>
               <div className="pt-1 flex-1 pr-6">
                 {editingNameId === client.id ? (
